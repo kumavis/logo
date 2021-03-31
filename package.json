@@ -1,21 +1,13 @@
 {
-  "name": "@metamask/logo",
-  "version": "2.5.0",
-  "description": "A browserifyable 3d metamask logo. [Live demo](http://metamask.github.io/logo/).",
+  "name": "metamask-logo",
+  "version": "2.2.1",
+  "description": "A browserifyable 3d metamask logo. [Live demo](http://metamask.github.io/metamask-logo/).",
   "main": "index.js",
   "scripts": {
     "build": "browserify example/example.js -g uglifyify -o bundle.js",
+    "start": "wzrd example/example.js:bundle.js",
     "convert": "node convert.js > fox.json",
-    "lint": "eslint . --ext js,json",
-    "lint:fix": "yarn lint --fix"
-  },
-  "files": [
-    "bundle.js",
-    "fox.json"
-  ],
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/",
-    "access": "public"
+    "test": "standard index.js"
   },
   "author": "MetaMask",
   "license": "ISC",
@@ -24,20 +16,18 @@
     "gl-vec3": "1.0.3"
   },
   "devDependencies": {
-    "@metamask/eslint-config": "^3.2.0",
-    "browserify": "^16.5.2",
+    "browserify": "^16.2.2",
     "copy-to-clipboard": "^3.0.5",
-    "eslint": "^7.7.0",
-    "eslint-plugin-import": "^2.22.0",
-    "eslint-plugin-json": "^2.1.2",
-    "uglifyify": "^5.0.2"
+    "standard": "^14.3.1",
+    "uglifyify": "^5.0.2",
+    "wzrd": "^1.5.0"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MetaMask/logo.git"
+    "url": "git+https://github.com/MetaMask/metamask-logo.git"
   },
   "bugs": {
-    "url": "https://github.com/MetaMask/logo/issues"
+    "url": "https://github.com/MetaMask/metamask-logo/issues"
   },
-  "homepage": "https://github.com/MetaMask/logo#readme"
+  "homepage": "https://github.com/MetaMask/metamask-logo#readme"
 }

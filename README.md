@@ -1,6 +1,6 @@
 # Metamask Logo
 
-A browserifyable 3d metamask logo. [Live demo](https://metamask.github.io/logo/).
+A browserifyable 3d metamask logo. [Live demo](http://metamask.github.io/metamask-logo/).
 
 This repo can both be included as a browserifiable module, and includes a sample app.
 
@@ -8,12 +8,11 @@ The sample app address is `index.html`.
 The sample app javascript is `bundle.js`, which is built from `sample.js` using the `build` task (see the `package.json`).
 
 ## API
-
 ```javascript
-const ModelViewer = require('@metamask/logo')
+var ModelViewer = require('metamask-logo')
 
 // To render with fixed dimensions:
-const viewer = ModelViewer({
+var viewer = ModelViewer({
 
   // Dictates whether width & height are px or multiplied
   pxNotRatio: true,
@@ -32,7 +31,7 @@ const viewer = ModelViewer({
 })
 
 // add viewer to DOM
-const container = document.getElementById('logo-container')
+var container = document.getElementById('logo-container')
 container.appendChild(viewer.container)
 
 // look at something on the page
@@ -47,8 +46,3 @@ viewer.setFollowMouse(true)
 // deallocate nicely
 viewer.stopAnimation()
 ```
-
-## Running Example
-
-First, rebuild `browserify example/example.js -o bundle.js`.
-Then, run a local server in this folder and visit it. For example, `http-server`.

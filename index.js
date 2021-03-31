@@ -1,12 +1,12 @@
-const perspective = require('gl-mat4/perspective')
-const multiply = require('gl-mat4/multiply')
-const lookAt = require('gl-mat4/lookAt')
-const invert = require('gl-mat4/invert')
-const rotate = require('gl-mat4/rotate')
-const transform = require('gl-vec3/transformMat4')
-const foxJSON = require('./fox.json')
+var perspective = require('gl-mat4/perspective')
+var multiply = require('gl-mat4/multiply')
+var lookAt = require('gl-mat4/lookAt')
+var invert = require('gl-mat4/invert')
+var rotate = require('gl-mat4/rotate')
+var transform = require('gl-vec3/transformMat4')
+var foxJSON = require('./fox.json')
 
-const SVG_NS = 'http://www.w3.org/2000/svg'
+var SVG_NS = 'http://www.w3.org/2000/svg'
 
 function createNode (type) {
   return document.createElementNS(SVG_NS, type)
@@ -17,31 +17,126 @@ function setAttribute (node, attribute, value) {
 }
 
 module.exports = function createLogo (options_) {
-  const options = options_ || {}
+  var options = options_ || {}
 
-  let followCursor = Boolean(options.followMouse)
-  let followMotion = Boolean(options.followMotion)
-  const slowDrift = Boolean(options.slowDrift)
-  let shouldRender = true
+  var followCursor = !!options.followMouse
+  var followMotion = !!options.followMotion
+  var slowDrift = !!options.slowDrift
+  var shouldRender = true
 
-  const DISTANCE = 400
-  const lookCurrent = [0, 0]
-  const lookRate = 0.3
+  var DISTANCE = 400
+  var lookCurrent = [0, 0]
+  var lookRate = 0.3
 
-  let width = options.width || 400
-  let height = options.height || 400
-  const container = createNode('svg')
-  const mouse = {
+  var width = options.width || 400
+  var height = options.height || 400
+  var container = createNode('svg')
+  var mouse = {
     x: 0,
-    y: 0,
+    y: 0
   }
 
-  const NUM_VERTS = foxJSON.positions.length
+  var NUM_VERTS = foxJSON.positions.length
 
-  const positions = new Float32Array(3 * NUM_VERTS)
-  const transformed = new Float32Array(3 * NUM_VERTS)
+  var positions = new Float32Array(3 * NUM_VERTS)
+  let origPositions = new Float32Array(3 * NUM_VERTS)
+  var transformed = new Float32Array(3 * NUM_VERTS)
 
-  const toDraw = []
+  let applyDistortions = distortFold
+
+  // glitch
+  function distortGlitch () {
+    const pointCount = positions.length / 3
+    for (let polygonIndex = 0; polygonIndex < pointCount; polygonIndex++) {
+      const x = polygonIndex * 3 + 0
+      const y = polygonIndex * 3 + 1
+      const z = polygonIndex * 3 + 2
+      // strong along x
+      positions[x] = origPositions[x] + 20 * getRandom()
+      positions[y] = origPositions[y] + 2 * getRandom()
+      positions[z] = origPositions[z] + 2 * getRandom()
+    }
+  }
+
+  // glitch up and down
+  function distortTime () {
+    const pointCount = positions.length / 3
+    for (let polygonIndex = 0; polygonIndex < pointCount; polygonIndex++) {
+      const x = polygonIndex * 3 + 0
+      const y = polygonIndex * 3 + 1
+      const z = polygonIndex * 3 + 2
+      // strong along x
+      positions[x] = origPositions[x] + 20 * getSinIntensity() * Math.random()
+      positions[y] = origPositions[y] + 20 * getSinIntensity() * Math.random()
+      positions[z] = origPositions[z] + 20 * getSinIntensity() * Math.random()
+    }
+  }
+
+  // bug: grow head slowly?
+  function distortGrow () {
+    const progress = getSinIntensity()
+    const pointCount = positions.length / 3
+    const polygonProgressWidth = 1/pointCount
+    for (let polygonIndex = 0; polygonIndex < pointCount; polygonIndex++) {
+      // calculate the current progress for each polygon
+      const polygonProgressStart = polygonIndex * polygonProgressWidth
+      const polygonProgressEnd = polygonProgressStart + polygonProgressWidth
+      const polygonProgressUncapped = (progress - polygonProgressStart) / (polygonProgressEnd - polygonProgressStart)
+      const polygonProgress = Math.min(Math.max(polygonProgressUncapped, 0), 1)
+      // the previous polygon (self referential for the first one)
+      const prevPolygonIndex = Math.max(polygonIndex, polygonIndex - 1)
+      const prevX = origPositions[prevPolygonIndex * 3 + 0]
+      const prevY = origPositions[prevPolygonIndex * 3 + 1]
+      const prevZ = origPositions[prevPolygonIndex * 3 + 2]
+      const x = polygonIndex * 3 + 0
+      const y = polygonIndex * 3 + 1
+      const z = polygonIndex * 3 + 2
+      // strong along x
+      positions[x] = prevX + polygonProgress * origPositions[x]
+      positions[y] = prevY + polygonProgress * origPositions[y]
+      positions[z] = prevZ + polygonProgress * origPositions[z]
+    }
+  }
+
+    // bug: grow head slowly?
+    function distortFold () {
+      const progress = getSinIntensity(5000)
+      const pointCount = positions.length / 3
+      const polygonProgressWidth = 1/pointCount
+      // reset positions
+      positions = origPositions.slice()
+      for (let polygonIndex = 0; polygonIndex < pointCount; polygonIndex++) {
+        // calculate the current progress for each polygon
+        const polygonProgressStart = polygonIndex * polygonProgressWidth
+        const polygonProgressEnd = polygonProgressStart + polygonProgressWidth
+        const polygonProgressUncapped = (progress - polygonProgressStart) / (polygonProgressEnd - polygonProgressStart)
+        const polygonProgress = Math.min(Math.max(polygonProgressUncapped, 0), 1)
+        // the previous polygon (self referential for the first one)
+        const prevPolygonIndex = Math.max(0, polygonIndex - 1)
+        const prevX = positions[prevPolygonIndex * 3 + 0]
+        const prevY = positions[prevPolygonIndex * 3 + 1]
+        const prevZ = positions[prevPolygonIndex * 3 + 2]
+        const x = polygonIndex * 3 + 0
+        const y = polygonIndex * 3 + 1
+        const z = polygonIndex * 3 + 2
+        // console.log(polygonIndex, polygonProgress)
+        positions[x] = (prevX + (polygonProgress * (origPositions[x] - prevX)))
+        positions[y] = (prevY + (polygonProgress * (origPositions[y] - prevY)))
+        positions[z] = (prevZ + (polygonProgress * (origPositions[z] - prevZ)))
+      }
+    }
+
+  // random between (-1, 1)
+  function getRandom () {
+    return (2 * Math.random()) - 1
+  }
+
+  // sin between 0-1
+  function getSinIntensity (speed = 1000) {
+    return (Math.sin(Date.now()/speed) + 1) / 2
+  }
+
+  var toDraw = []
 
   if (!options.pxNotRatio) {
     width = (window.innerWidth * (options.width || 0.25)) | 0
@@ -53,27 +148,31 @@ module.exports = function createLogo (options_) {
     }
   }
 
-  setAttribute(container, 'width', `${width}px`)
-  setAttribute(container, 'height', `${height}px`)
+  setAttribute(container, 'width', width + 'px')
+  setAttribute(container, 'height', height + 'px')
 
   function setLookAt (target) {
-    const bounds = container.getBoundingClientRect()
-    mouse.x = 1.0 - ((2.0 * (target.x - bounds.left)) / bounds.width)
-    mouse.y = 1.0 - ((2.0 * (target.y - bounds.top)) / bounds.height)
+    var bounds = container.getBoundingClientRect()
+    mouse.x = 1.0 - 2.0 * (target.x - bounds.left) / bounds.width
+    mouse.y = 1.0 - 2.0 * (target.y - bounds.top) / bounds.height
   }
 
-  document.body.appendChild(container);
-  (function () {
-    const pp = foxJSON.positions
-    let ptr = 0
-    for (let i = 0; i < pp.length; ++i) {
-      const p = pp[i]
-      for (let j = 0; j < 3; ++j) {
-        positions[ptr] = p[j]
-        ptr += 1
+  document.body.appendChild(container)
+
+  // convert nested arrays into a single array
+  // [[x1,y1,z1],[x2,y2,z2]] -> [x1,y1,z1,x2,y2,z2]
+  ;(function () {
+    var pp = foxJSON.positions
+    var ptr = 0
+    for (var i = 0; i < pp.length; ++i) {
+      var p = pp[i]
+      for (var j = 0; j < 3; ++j) {
+        positions[ptr++] = p[j]
       }
     }
   })()
+
+  origPositions = positions.slice()
 
   function Polygon (svg, indices) {
     this.svg = svg
@@ -81,68 +180,63 @@ module.exports = function createLogo (options_) {
     this.zIndex = 0
   }
 
-  const polygons = (function () {
-    const _polygons = []
-    for (let i = 0; i < foxJSON.chunks.length; ++i) {
-      const chunk = foxJSON.chunks[i]
-      const color = `rgb(${chunk.color})`
-      const { faces } = chunk
-      for (let j = 0; j < faces.length; ++j) {
-        const f = faces[j]
-        const polygon = createNode('polygon')
+  var polygons = (function () {
+    var polygons = []
+    for (var i = 0; i < foxJSON.chunks.length; ++i) {
+      var chunk = foxJSON.chunks[i]
+      var color = 'rgb(' + chunk.color + ')'
+      var faces = chunk.faces
+      for (var j = 0; j < faces.length; ++j) {
+        var f = faces[j]
+        var polygon = createNode('polygon')
         setAttribute(
           polygon,
           'fill',
-          color,
-        )
+          color)
         setAttribute(
           polygon,
           'stroke',
-          color,
-        )
+          color)
         setAttribute(
           polygon,
           'points',
-          '0,0, 10,0, 0,10',
-        )
+          '0,0, 10,0, 0,10')
         container.appendChild(polygon)
-        _polygons.push(new Polygon(polygon, f))
+        polygons.push(new Polygon(polygon, f))
       }
     }
-    return _polygons
+    return polygons
   })()
 
-  const computeMatrix = (function () {
-    const objectCenter = new Float32Array(3)
-    const up = new Float32Array([0, 1, 0])
-    const projection = new Float32Array(16)
-    const model = new Float32Array(16)
-    const view = lookAt(
+  var computeMatrix = (function () {
+    var objectCenter = new Float32Array(3)
+    var up = new Float32Array([0, 1, 0])
+    var projection = new Float32Array(16)
+    var model = new Float32Array(16)
+    var view = lookAt(
       new Float32Array(16),
       new Float32Array([0, 0, DISTANCE]),
       objectCenter,
-      up,
-    )
-    const invView = invert(new Float32Array(16), view)
-    const invProjection = new Float32Array(16)
-    const target = new Float32Array(3)
-    const transformedMatrix = new Float32Array(16)
+      up)
+    var invView = invert(new Float32Array(16), view)
+    var invProjection = new Float32Array(16)
+    var target = new Float32Array(3)
+    var transformed = new Float32Array(16)
 
-    const X = new Float32Array([1, 0, 0])
-    const Y = new Float32Array([0, 1, 0])
-    const Z = new Float32Array([0, 0, 1])
+    var X = new Float32Array([1, 0, 0])
+    var Y = new Float32Array([0, 1, 0])
+    var Z = new Float32Array([0, 0, 1])
 
     return function () {
-      const rect = container.getBoundingClientRect()
-      const viewportWidth = rect.width
-      const viewportHeight = rect.height
+      var rect = container.getBoundingClientRect()
+      var viewportWidth = rect.width
+      var viewportHeight = rect.height
       perspective(
         projection,
         Math.PI / 4.0,
         viewportWidth / viewportHeight,
         100.0,
-        1000.0,
-      )
+        1000.0)
       invert(invProjection, projection)
       target[0] = lookCurrent[0]
       target[1] = lookCurrent[1]
@@ -153,52 +247,51 @@ module.exports = function createLogo (options_) {
         model,
         objectCenter,
         target,
-        up,
-      )
+        up)
       if (slowDrift) {
-        const time = (Date.now() / 1000.0)
+        var time = (Date.now() / 1000.0)
         rotate(model, model, 0.1 + (Math.sin(time / 3) * 0.2), X)
         rotate(model, model, -0.1 + (Math.sin(time / 2) * 0.03), Z)
         rotate(model, model, 0.5 + (Math.sin(time / 3) * 0.2), Y)
       }
 
-      multiply(transformedMatrix, projection, view)
-      multiply(transformedMatrix, transformedMatrix, model)
+      multiply(transformed, projection, view)
+      multiply(transformed, transformed, model)
 
-      return transformedMatrix
+      return transformed
     }
   })()
 
   function updatePositions (M) {
-    const m00 = M[0]
-    const m01 = M[1]
-    const m02 = M[2]
-    const m03 = M[3]
-    const m10 = M[4]
-    const m11 = M[5]
-    const m12 = M[6]
-    const m13 = M[7]
-    const m20 = M[8]
-    const m21 = M[9]
-    const m22 = M[10]
-    const m23 = M[11]
-    const m30 = M[12]
-    const m31 = M[13]
-    const m32 = M[14]
-    const m33 = M[15]
+    var m00 = M[0]
+    var m01 = M[1]
+    var m02 = M[2]
+    var m03 = M[3]
+    var m10 = M[4]
+    var m11 = M[5]
+    var m12 = M[6]
+    var m13 = M[7]
+    var m20 = M[8]
+    var m21 = M[9]
+    var m22 = M[10]
+    var m23 = M[11]
+    var m30 = M[12]
+    var m31 = M[13]
+    var m32 = M[14]
+    var m33 = M[15]
 
-    for (let i = 0; i < NUM_VERTS; ++i) {
-      const x = positions[3 * i]
-      const y = positions[(3 * i) + 1]
-      const z = positions[(3 * i) + 2]
+    for (var i = 0; i < NUM_VERTS; ++i) {
+      var x = positions[3 * i]
+      var y = positions[3 * i + 1]
+      var z = positions[3 * i + 2]
 
-      const tw = (x * m03) + (y * m13) + (z * m23) + m33
+      var tw = x * m03 + y * m13 + z * m23 + m33
       transformed[3 * i] =
-        ((x * m00) + (y * m10) + (z * m20) + m30) / tw
-      transformed[(3 * i) + 1] =
-        ((x * m01) + (y * m11) + (z * m21) + m31) / tw
-      transformed[(3 * i) + 2] =
-        ((x * m02) + (y * m12) + (z * m22) + m32) / tw
+        (x * m00 + y * m10 + z * m20 + m30) / tw
+      transformed[3 * i + 1] =
+        (x * m01 + y * m11 + z * m21 + m31) / tw
+      transformed[3 * i + 2] =
+        (x * m02 + y * m12 + z * m22 + m32) / tw
     }
   }
 
@@ -207,45 +300,44 @@ module.exports = function createLogo (options_) {
   }
 
   function updateFaces () {
-    let i
-    const rect = container.getBoundingClientRect()
-    const w = rect.width
-    const h = rect.height
+    var i
+    var rect = container.getBoundingClientRect()
+    var w = rect.width
+    var h = rect.height
     toDraw.length = 0
     for (i = 0; i < polygons.length; ++i) {
-      const poly = polygons[i]
-      const { indices } = poly
+      var poly = polygons[i]
+      var indices = poly.indices
 
-      const i0 = indices[0]
-      const i1 = indices[1]
-      const i2 = indices[2]
-      const ax = transformed[3 * i0]
-      const ay = transformed[(3 * i0) + 1]
-      const bx = transformed[3 * i1]
-      const by = transformed[(3 * i1) + 1]
-      const cx = transformed[3 * i2]
-      const cy = transformed[(3 * i2) + 1]
-      const det = ((bx - ax) * (cy - ay)) - ((by - ay) * (cx - ax))
+      var i0 = indices[0]
+      var i1 = indices[1]
+      var i2 = indices[2]
+      var ax = transformed[3 * i0]
+      var ay = transformed[3 * i0 + 1]
+      var bx = transformed[3 * i1]
+      var by = transformed[3 * i1 + 1]
+      var cx = transformed[3 * i2]
+      var cy = transformed[3 * i2 + 1]
+      var det = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
       if (det < 0) {
         continue
       }
 
-      const points = []
-      let zmax = -Infinity
-      let zmin = Infinity
-      const element = poly.svg
-      for (let j = 0; j < 3; ++j) {
-        const idx = indices[j]
+      var points = []
+      var zmax = -Infinity
+      var zmin = Infinity
+      var element = poly.svg
+      for (var j = 0; j < 3; ++j) {
+        var idx = indices[j]
         points.push(
-          `${0.5 * w * (1.0 - transformed[3 * idx])},${
-            0.5 * h * (1.0 - transformed[(3 * idx) + 1])}`,
-        )
-        const z = transformed[(3 * idx) + 2]
+          0.5 * w * (1.0 - transformed[3 * idx]) + ',' +
+          0.5 * h * (1.0 - transformed[3 * idx + 1]))
+        var z = transformed[3 * idx + 2]
         zmax = Math.max(zmax, z)
         zmin = Math.min(zmin, z)
       }
-      poly.zIndex = zmax + (0.25 * zmin)
-      const joinedPoints = points.join(' ')
+      poly.zIndex = zmax + 0.25 * zmin
+      var joinedPoints = points.join(' ')
 
       if (joinedPoints.indexOf('NaN') === -1) {
         setAttribute(element, 'points', joinedPoints)
@@ -260,36 +352,24 @@ module.exports = function createLogo (options_) {
     }
   }
 
-  function stopAnimation () {
-    shouldRender = false
-  }
-  function startAnimation () {
-    shouldRender = true
-  }
-  function setFollowMouse (state) {
-    followCursor = state
-  }
-  function setFollowMotion (state) {
-    followMotion = state
-  }
+  function stopAnimation () { shouldRender = false }
+  function startAnimation () { shouldRender = true }
+  function setFollowMouse (state) { followCursor = state }
+  function setFollowMotion (state) { followMotion = state }
 
   window.addEventListener('mousemove', function (ev) {
-    if (!shouldRender) {
-      startAnimation()
-    }
+    if (!shouldRender) { startAnimation() }
     if (followCursor) {
       setLookAt({
         x: ev.clientX,
-        y: ev.clientY,
+        y: ev.clientY
       })
       renderScene()
     }
   })
 
   window.addEventListener('deviceorientation', function (event) {
-    if (!shouldRender) {
-      startAnimation()
-    }
+    if (!shouldRender) { startAnimation() }
     if (followMotion) {
       // gamma: left to right
       const leftToRight = event.gamma
@@ -303,51 +383,40 @@ module.exports = function createLogo (options_) {
       const acceleration = 10
 
       setLookAt({
-        x: xOffset + (leftToRight * acceleration),
-        y: yOffset + (frontToBack * acceleration),
+        x: xOffset + leftToRight * acceleration,
+        y: yOffset + frontToBack * acceleration
       })
       renderScene()
     }
   })
 
-  function lookAtAndRender (target) {
-    setLookAt(target)
-
-    lookCurrent[0] = mouse.x
-    lookCurrent[1] = mouse.y + (0.085 / lookRate)
-
-    const matrix = computeMatrix()
-    updatePositions(matrix)
-    updateFaces()
-    stopAnimation()
-  }
-
   function renderScene () {
-    if (!shouldRender) {
-      return
-    }
+    if (!shouldRender) return
     window.requestAnimationFrame(renderScene)
 
-    const li = (1.0 - lookRate)
+    applyDistortions()
 
-    lookCurrent[0] = (li * lookCurrent[0]) + (lookRate * mouse.x)
-    lookCurrent[1] = (li * lookCurrent[1]) + (lookRate * mouse.y) + 0.085
+    var li = (1.0 - lookRate)
+    var bounds = container.getBoundingClientRect()
 
-    const matrix = computeMatrix()
+    lookCurrent[0] = li * lookCurrent[0] + lookRate * mouse.x
+    lookCurrent[1] = li * lookCurrent[1] + lookRate * mouse.y + 0.085
+
+    var matrix = computeMatrix()
+    // update svg
     updatePositions(matrix)
     updateFaces()
-    stopAnimation()
+    // stopAnimation()
   }
 
   renderScene()
 
   return {
-    container,
+    container: container,
     lookAt: setLookAt,
-    setFollowMouse,
-    setFollowMotion,
-    stopAnimation,
-    startAnimation,
-    lookAtAndRender,
+    setFollowMouse: setFollowMouse,
+    setFollowMotion: setFollowMotion,
+    stopAnimation: stopAnimation,
+    startAnimation: startAnimation
   }
 }
